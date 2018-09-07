@@ -1,0 +1,46 @@
+TODO: Make this list up to date with Dockerfile operations or replace with proper comments in Dockerfile
+
+1. FROM ubuntu:bionic as builder
+
+2. Update & install dep (1)
+
+3. Download & build Nominatim to /srv/nominatim & 
+
+4. FROM ubuntu:bionic
+
+5. Update locales
+
+6. Force bash shell everywhere
+
+7. Update & install dep (2)
+
+8. Cleanup apt
+
+9. Install python module osmium
+
+10. (?) Copy Nominatim from builder image (use xenial maybe)
+
+11. Create nominatim OS user with HOME=/srv/nominatim
+
+12. Configure Nominatim settings/local.php
+
+13. Download country_grid.sql.gz (optional)
+
+14. Download required PBF files (space separated)
+ --build-arg PBF_URL="url1 url2 url3 ..."
+
+15. Filter administrative boundaries (optional)
+
+16. Configure apache virtual host
+
+17. Add postgres users
+
+18. Tune postgresql configuration for import
+
+19. Import PBF files to postgres
+
+20. Use safe postgresql configuration
+
+21. Expose apache port to host system
+
+22. Configure init script to run at container startup
