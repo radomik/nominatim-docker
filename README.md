@@ -37,7 +37,7 @@ docker build . \
 ```
 3. Run image
 ```shell
-docker run --restart=always -d -p 8089:8080 merlinnot-nominatim-docker
+docker run --restart=always -d -p 8089:8080 dm-nominatim-docker
 ```
 4. Access:
 - http://127.0.0.1:8089
