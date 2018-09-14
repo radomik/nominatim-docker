@@ -8,9 +8,8 @@ ENV NOMINATIM_VERSION 3.2.0
 ENV DEBIAN_FRONTEND noninteractive
 
 # Set build variables
-ARG PGSQL_VERSION=10
-ARG POSTGIS_VERSION=2.4
-ARG BUILD_THREADS=16
+ENV PGSQL_VERSION=10
+ENV POSTGIS_VERSION=2.4
 
 # Use bash shell only (required for later proper script operation)
 RUN rm /bin/sh && ln -s /bin/bash /bin/sh
@@ -97,10 +96,6 @@ USER root
 RUN pip install --upgrade pip
 RUN pip install osmium
 
-# Copy the application from the builder image
-#TODO: Try this when webpage does not work
-#COPY --from=builder /srv/nominatim /srv/nominatim
-
 # Create nominatim user account
 USER root
 ENV USERNAME nominatim
@@ -110,7 +105,6 @@ RUN chmod a+x ${NOMINATIM_HOME}
 
 # Configure Nominatim
 USER ${USERNAME}
-ARG REPLICATION_URL=https://planet.osm.org/replication/hour/
 WORKDIR ${NOMINATIM_HOME}
 ENV FLATNODE_PATH ${NOMINATIM_HOME}/flatnode
 ENV PYOSMIUM_PATH /usr/local/bin/pyosmium-get-changes
@@ -124,58 +118,12 @@ RUN echo "@define('CONST_Osm2pgsql_Flatnode_File', '${FLATNODE_PATH}');" >> ./se
 RUN echo "@define('CONST_Pyosmium_Binary', '${PYOSMIUM_PATH}');" >> ./settings/local.php
 RUN echo "# Website settings" >> ./settings/local.php
 RUN echo "@define('CONST_Website_BaseURL', '/');" >> ./settings/local.php
-RUN echo "#TODO: Do not use below settings if there are multiple PBF files in use" >> ./settings/local.php
-RUN echo "#TODO: Otherwise use cron job and custom script based approach" >> ./settings/local.php
-RUN echo "#@define('CONST_Replication_Url', '${REPLICATION_URL}');" >> ./settings/local.php
-RUN echo "#@define('CONST_Replication_MaxInterval', '86400');" >> ./settings/local.php
-RUN echo "#@define('CONST_Replication_Update_Interval', '86400');" >> ./settings/local.php
-RUN echo "#@define('CONST_Replication_Recheck_Interval', '900');" >> ./settings/local.php
 RUN echo "?>" >> ./settings/local.php
-
-# Download country_grid.sql.gz (optional)
-USER ${USERNAME}
-WORKDIR ${NOMINATIM_HOME}
-RUN wget -q -O ./data/country_osm_grid.sql.gz \
-      http://www.nominatim.org/data/country_grid.sql.gz
-
-# Download data for initial import
-USER ${USERNAME}
-ENV PBF_DIR ${NOMINATIM_HOME}/pbf
-ARG PBF_URL=https://planet.osm.org/pbf/planet-latest.osm.pbf
-RUN echo "Fetch: ${PBF_URL}"; \
-	rm -r ${PBF_DIR} ; \
-	mkdir ${PBF_DIR} ; \
-    read -a PBF_URL_ARRAY <<< ${PBF_URL} ; \
-    cd ${PBF_DIR} ; \
-    for URL in "${PBF_URL_ARRAY[@]}" ; do \
-		echo "Fetch ${URL}" ; \
-		wget -q "${URL}" ; \
-    done
-    
-# Join PBF files into one
-USER ${USERNAME}
-ENV PBF_ALL=${PBF_DIR}/data.pbf
-RUN \
-    cd ${PBF_DIR} ; \
-    wget -q http://m.m.i24.cc/osmconvert.c ; \
-    cc -x c osmconvert.c -lz -O3 -o osmconvert ; \
-	for PBF in ${PBF_DIR}/*.pbf; do \
-		O5M=$(echo ${PBF} | sed 's/.osm.pbf$/.o5m/g') ; \
-		echo "Convert: ${PBF} -> ${O5M}" ; \
-		./osmconvert ${PBF} -o=${O5M} ; \
-		rm ${PBF} ; \
-		O5M=${PBF_DIR}/data.o5m ; \
-		echo "Merge: *.o5m -> ${O5M}" ; \
-		./osmconvert ${PBF_DIR}/*.o5m -o=${O5M} ; \
-		echo "Convert: ${O5M} -> ${PBF_ALL}" ; \
-		./osmconvert ${O5M} -o=${PBF_ALL} ; \
-		rm ${O5M} ; \
-	done ; \
-	rm osmconvert.c osmconvert
-
-# Filter administrative boundaries
-#TODO: Make if needed based on merlinnot/nominatim-docker
-
+RUN cd ${NOMINATIM_HOME}/utils && \
+	wget -q http://m.m.i24.cc/osmconvert.c && \
+	cc -x c osmconvert.c -lz -O3 -o osmconvert && \
+	rm osmconvert.c
+	
 # Configure Apache
 ENV INTERNAL_LISTEN_PORT 8080
 USER root
@@ -200,65 +148,18 @@ RUN service postgresql start && \
     sudo -u postgres createuser www-data && \
     service postgresql stop
 
-# Tune postgresql configuration for import
-USER root
-ARG BUILD_MEMORY=32GB
-ENV PGCONFIG_URL https://api.pgconfig.org/v1/tuning/get-config
-RUN IMPORT_CONFIG_URL="${PGCONFIG_URL}? \
-      format=alter_system& \
-      pg_version=${PGSQL_VERSION}& \
-      total_ram=${BUILD_MEMORY}& \
-      max_connections=$((8 * ${BUILD_THREADS} + 32))& \
-      environment_name=DW& \
-      include_pgbadger=false" && \
-    IMPORT_CONFIG_URL=${IMPORT_CONFIG_URL// /} && \
-    service postgresql start && \
-    ( curl -sSL "${IMPORT_CONFIG_URL}"; \
-      echo $'ALTER SYSTEM SET fsync TO \'off\';\n'; \
-      echo $'ALTER SYSTEM SET full_page_writes TO \'off\';\n'; \
-      echo $'ALTER SYSTEM SET logging_collector TO \'off\';\n'; \
-    ) | sudo -u postgres psql -e && \
-    service postgresql stop
-
-# Initial import
-USER root
-ARG OSM2PGSQL_CACHE=24000
-RUN service postgresql start ; \
-	echo "Loading ${PBF_ALL}" ; \
-	sudo -u nominatim ${NOMINATIM_BUILD}/utils/setup.php \
-	  --osm-file ${PBF_ALL} \
-	  --threads ${BUILD_THREADS} \
-	  --osm2pgsql-cache ${OSM2PGSQL_CACHE} \
-	  --all ; \
-    service postgresql stop
-
-# Use safe postgresql configuration
-USER root
-ARG RUNTIME_THREADS=2
-ARG RUNTIME_MEMORY=8GB
-RUN IMPORT_CONFIG_URL="${PGCONFIG_URL}? \
-      format=alter_system& \
-      pg_version=${PGSQL_VERSION}& \
-      total_ram=${RUNTIME_MEMORY}& \
-      max_connections=$((8 * ${RUNTIME_THREADS} + 32))& \
-      environment_name=WEB& \
-      include_pgbadger=true" && \
-    IMPORT_CONFIG_URL=${IMPORT_CONFIG_URL// /} && \
-    service postgresql start && \
-    ( curl -sSL "${IMPORT_CONFIG_URL}"; \
-      echo $'ALTER SYSTEM SET fsync TO \'on\';\n'; \
-      echo $'ALTER SYSTEM SET full_page_writes TO \'on\';\n'; \
-      echo $'ALTER SYSTEM SET logging_collector TO \'on\';\n'; \
-    ) | sudo -u postgres psql -e && \
-    service postgresql stop
-
 # Allow remote connections to PostgreSQL (optional)
-RUN echo "host all  all    0.0.0.0/0  trust" >> /etc/postgresql/${PGSQL_VERSION}/main/pg_hba.conf \
- && echo "listen_addresses='*'" >> /etc/postgresql/${PGSQL_VERSION}/main/postgresql.conf
-EXPOSE 5432
+#RUN echo "host all  all    0.0.0.0/0  trust" >> /etc/postgresql/${PGSQL_VERSION}/main/pg_hba.conf \
+# && echo "listen_addresses='*'" >> /etc/postgresql/${PGSQL_VERSION}/main/postgresql.conf
+#EXPOSE 5432
 
-# Expose ports
+# Expose Apache port
 EXPOSE 8080
+
+COPY --chown=nominatim scripts/init-pbf.sh ${NOMINATIM_HOME}/utils/
+COPY --chown=nominatim scripts/update-multiple-countries.sh ${NOMINATIM_HOME}/utils/update.sh
+USER ${USERNAME}
+RUN chmod +x ${NOMINATIM_HOME}/utils/init-pbf.sh ${NOMINATIM_HOME}/utils/update.sh
 
 # Init scripts
 COPY scripts/docker-entrypoint.sh /
