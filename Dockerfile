@@ -162,7 +162,7 @@ USER ${USERNAME}
 RUN chmod +x ${NOMINATIM_HOME}/utils/init-pbf.sh ${NOMINATIM_HOME}/utils/update.sh
 
 # Init scripts
-COPY scripts/docker-entrypoint.sh /
-USER root
-RUN chmod +x /docker-entrypoint.sh
-ENTRYPOINT ["/docker-entrypoint.sh"]
+#COPY scripts/docker-entrypoint.sh /
+#USER root
+#RUN chmod +x /docker-entrypoint.sh
+#ENTRYPOINT ["/docker-entrypoint.sh"]

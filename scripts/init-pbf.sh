@@ -1,7 +1,5 @@
 #!/bin/bash
 
-whoami
-
 COUNTRIES=()
 BUILD_MEMORY=32
 OSM2PGSQL_CACHE=24000
@@ -19,6 +17,11 @@ if [ $# -eq 0 -o "$1" == "-h" -o "$1" == "--help" ] ; then
 	-r <runtime thread count (default: $RUNTIME_THREADS)>\n\
 	"
 	exit 0
+fi
+
+if [ "$(whoami)" != "root" ] ; then
+	echo "Script shall be run as root. Current user: $(whoami)"
+	exit 1
 fi
 
 while getopts "p:b:j:o:t:r:" OPT; do
@@ -89,6 +92,7 @@ IMPORT_CONFIG_URL="${PGCONFIG_URL}? \
       environment_name=DW& \
       include_pgbadger=false" && \
     IMPORT_CONFIG_URL=${IMPORT_CONFIG_URL// /} && \
+    echo "IMPORT_CONFIG_URL: $IMPORT_CONFIG_URL" && \
     service postgresql start && \
     ( curl -sSL "${IMPORT_CONFIG_URL}"; \
       echo $'ALTER SYSTEM SET fsync TO \'off\';\n'; \
@@ -108,14 +112,15 @@ sudo -u $USERNAME ${NOMINATIM_BUILD}/utils/setup.php \
 service postgresql stop
 
 # Use safe postgresql configuration
-RUN IMPORT_CONFIG_URL="${PGCONFIG_URL}? \
+IMPORT_CONFIG_URL="${PGCONFIG_URL}? \
       format=alter_system& \
       pg_version=${PGSQL_VERSION}& \
-      total_ram=${RUNTIME_MEMORY}& \
+      total_ram=${RUNTIME_MEMORY}GB& \
       max_connections=$((8 * ${RUNTIME_THREADS} + 32))& \
       environment_name=WEB& \
       include_pgbadger=true" && \
     IMPORT_CONFIG_URL=${IMPORT_CONFIG_URL// /} && \
+    echo "IMPORT_CONFIG_URL: $IMPORT_CONFIG_URL" && \
     service postgresql start && \
     ( curl -sSL "${IMPORT_CONFIG_URL}"; \
       echo $'ALTER SYSTEM SET fsync TO \'on\';\n'; \
@@ -123,3 +128,10 @@ RUN IMPORT_CONFIG_URL="${PGCONFIG_URL}? \
       echo $'ALTER SYSTEM SET logging_collector TO \'on\';\n'; \
     ) | sudo -u postgres psql -e && \
     service postgresql stop
+    
+service postgresql start
+
+tail -f /var/log/apache2/access.log &
+
+# Run Apache in the foreground
+/usr/sbin/apache2ctl -D FOREGROUND

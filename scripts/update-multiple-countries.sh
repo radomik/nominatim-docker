@@ -1,10 +1,15 @@
 #!/bin/bash
 
+if [ "$(whoami)" != "root" ] ; then
+	echo "Script shall be run as root. Current user: $(whoami)"
+	exit 1
+fi
+
 USERNAME="nominatim"
 NOMINATIM_HOME="/srv/nominatim"
-PBF_DIR="${NOMINATIM_HOME}/pbf"
-PBF_ALL="${PBF_DIR}/data.pbf"
 COUNTRY_LIST="${NOMINATIM_HOME}/data/countries.txt"
+BUILD_DIR="${NOMINATIM_HOME}/build"
+UPDATE_PHP="./utils/update.php"
 
 ### Foreach country check if configuration exists (if not create one) and then import the diff
 while read -r COUNTRY; do
@@ -24,22 +29,26 @@ while read -r COUNTRY; do
     FILENAME=${COUNTRY//[\/]/_}
     echo "Running: osmosis --rri workingDirectory=${DIR}/. --wxc ${FILENAME}.osc.gz" 
     sudo -u $USERNAME osmosis --rri workingDirectory=${DIR}/. --wxc ${FILENAME}.osc.gz
-done < $COUNTRY_LIST
+done < "$COUNTRY_LIST"
 
 INDEX=0 # false
 
+cd "$BUILD_DIR"
+ls -al
+
 ### Foreach diff files do the import
-cd "${NOMINATIM_HOME}/updates"
 for OSC in *.osc.gz; do
-	echo "Running: utils/update.php --import-diff updates/${OSC} --no-npi" 
-    sudo -u $USERNAME ${NOMINATIM_HOME}/utils/update.php --import-diff ${NOMINATIM_HOME}/updates/${OSC} --no-npi
+	echo "Running: $UPDATE_PHP --import-diff updates/${OSC} --no-npi" 
+    sudo -u $USERNAME "$UPDATE_PHP" --import-diff ${NOMINATIM_HOME}/updates/${OSC} --no-npi
     INDEX=1
+    ls -al
 done
 
 ### Re-index if needed
 if ((${INDEX})); then
 	echo "Re-indexing"
-    sudo -u $USERNAME ${NOMINATIM}/utils/update.php --index
+    sudo -u $USERNAME "$UPDATE_PHP" --index
+    ls -al
 fi
 
 ### Remove all diff files
