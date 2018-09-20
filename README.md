@@ -9,40 +9,34 @@ This is modified version of following Nominatim docker containers:
 - https://github.com/peter-evans/nominatim-docker
 
 Idea of this repository is to add ability of:
-- importing multiple countries *.PBF files
-- run periodical updates on every configured country (not available yet)
-
-## Usage Quide
-
-For detailed usage guide see [merlinnot/nominatim-docker/README.md](https://github.com/merlinnot/nominatim-docker/blob/master/README.md)
+- importing multiple countries into Nominatim server
+- run periodical updates on every configured country
 
 ### Quick guide
 
 1. Clone this repository
 
+
 2. Build image
 
 ```shell
 cd <project directory>
-docker build . -t dm-nominatim-docker
+docker build . -t <tag_name>
 ```
 
 3. Import Nominatim data files
 
-The following will create a new container, import PBF files and start Nominatim server.
+The following will create a new container, import PBF files and start Nominatim server configured with periodic updates enabled.
 
 ```shell
-docker run -d -p 8089:8080 --user=root dm-nominatim-docker /srv/nominatim/utils/init-pbf.sh -p europe/monaco -p europe/andorra -p europe/latvia -b 6 -j 2 -o 4500 -t 4 -r 2
-docker run -d -p 8089:8080 --user=root dm-nominatim-docker /srv/nominatim/utils/init-pbf.sh -p europe/monaco -b 6 -j 2 -o 4500 -t 4 -r 2
+docker run -d -p 8089:8080 --user=root <tag_name> /srv/nominatim/utils/init-pbf.sh -p europe/monaco -p europe/andorra -p europe/latvia
+docker run -d -p 8089:8080 --user=root <tag_name> /srv/nominatim/utils/init-pbf.sh -p europe/monaco
 ```
 
-Parameter description:
-- `-p` - countries to be imported (one country per single `-p` option)
-- `-b` - amount of memory in GB used by database during Nominatim data import
-- `-o` - amount of memory in MB used by OSM2PGSQL cache (shall be 75% of value given in `-b` option)
-- `-j` - amount of memory in GB used by database at runtime
-- `-t` - thread count used during Nominatim data import
-- `-r` - thread count used at runtime
+For parameter description and default values see:
+```shell
+docker run -p 8089:8080 --user=root <tag_name> /srv/nominatim/utils/init-pbf.sh --help
+```
 
 It may be useful to see logs directly after running container:
 ```shell
@@ -58,3 +52,26 @@ docker exec -it --user=root <container ID> bash -x /srv/nominatim/utils/update.s
 - http://127.0.0.1:8089
 - http://127.0.0.1:8089/search?q=Monte-Carlo&format=html
 - http://127.0.0.1:8089/search?q=Monte-Carlo&format=jsonv2
+
+
+---
+
+
+## Build image and push to dockerhub
+
+```shell
+# Build image locally 
+cd <project directory>
+docker build . -t symmetra/nominatim-docker
+
+# List images
+docker images
+	REPOSITORY                            TAG                 IMAGE ID            CREATED             SIZE
+	symmetra/nominatim-docker   latest              1887d6dd5680        7 seconds ago       1.56GB
+
+# Login to dockerhub (as: dariuszmikolajczuk)
+docker login
+
+# Push the image to dockerhub: https://hub.docker.com/r/symmetra/nominatim-docker/
+docker push symmetra/nominatim-docker
+```

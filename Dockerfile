@@ -20,9 +20,6 @@ RUN apt-get -y update
 RUN apt-get -y full-upgrade
 
 # Update locales
-USER root
-RUN apt-get -y update
-RUN apt-get -y full-upgrade
 RUN apt-get install -y --no-install-recommends locales
 ENV LANG C.UTF-8
 RUN locale-gen en_US.UTF-8
@@ -36,6 +33,8 @@ RUN apt-get install -y --no-install-recommends \
     curl \
     g++ \
     gcc \
+    cron \
+    anacron \
 	libboost-dev \
 	libboost-filesystem-dev \
 	libboost-python-dev \

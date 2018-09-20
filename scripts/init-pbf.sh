@@ -1,20 +1,50 @@
 #!/bin/bash
 
+function wait_for_update {
+	local update_lock_dir="/var/run/nominatim-update.lock"
+	if [ -d "$update_lock_dir" ] ; then
+		local t=0
+		local t_max=600
+		local step=10
+		echo "Nominatim update is running. Wait up to $t_max seconds"
+		while [ $t -lt $t_max ] ; do
+			sleep $step
+			t=$((t + step))
+			if [ ! -d "$update_lock_dir" ] ; then
+				echo "Update finished within $t seconds"
+				return
+			fi
+		done
+		echo "Update did not finished within $t seconds"
+		exit 1
+	fi
+}
+
 COUNTRIES=()
-BUILD_MEMORY=32
-OSM2PGSQL_CACHE=24000
-BUILD_THREADS=16
+BUILD_MEMORY=5
+OSM2PGSQL_CACHE=3800
+BUILD_THREADS=4
 RUNTIME_THREADS=2
-RUNTIME_MEMORY=8
+RUNTIME_MEMORY=4
+UPDATE_CRON_SETTINGS="40 4 * * *"
 
 if [ $# -eq 0 -o "$1" == "-h" -o "$1" == "--help" ] ; then
-	echo -e "Usage $0\n\
+	echo -e \
+"Available arguments:\n\
 	-p europe/country1 -p europe/country2 ...\n\
-	-b <build memory in GB (default: $BUILD_MEMORY GB)>\n\
-	-j <runtime memory in GB (default: $RUNTIME_MEMORY GB)>\n\
-	-o <OSM cache in MB - shall be 75% of build memory (default: $OSM2PGSQL_CACHE MB)>\n\
+		List of countries to be imported into Nominatim search engine\n\
+	-b <build memory (default: $BUILD_MEMORY GB)>\n\
+		Amount of memory in gigabytes used by Postgres database during Nominatim data initial import\n\
+	-o <OSM cache size (default: $OSM2PGSQL_CACHE MB)>\n\
+		Amount of memory in megabytes used by OSM2PGSQL cache during Nominatim data initial import (shall be 75% of value given in \`-b\` option)\n\
 	-t <build thread count (default: $BUILD_THREADS)>\n\
+		Thread count used by Postgres during Nominatim data import\n\
+	-j <runtime memory (default: $RUNTIME_MEMORY GB)>\n\
+		Amount of memory in gigabytes used by Postgres database at runtime\n\
 	-r <runtime thread count (default: $RUNTIME_THREADS)>\n\
+		Thread count used by Postgres at Nominatim runtime\n\
+	-c <data update cron settings (default: '$UPDATE_CRON_SETTINGS')>\n\
+		Crontab setting for Nominatim data update cron job (See https://crontab.guru/)\n\
 	"
 	exit 0
 fi
@@ -24,17 +54,18 @@ if [ "$(whoami)" != "root" ] ; then
 	exit 1
 fi
 
-while getopts "p:b:j:o:t:r:" OPT; do
+while getopts "p:b:o:t:j:r:c:" OPT; do
     case "$OPT" in
         p) COUNTRIES+=("$OPTARG") ;;
         b) BUILD_MEMORY="$OPTARG" ;;
-        j) RUNTIME_MEMORY="$OPTARG" ;;
         o) OSM2PGSQL_CACHE="$OPTARG" ;;
         t) BUILD_THREADS="$OPTARG" ;;
+        j) RUNTIME_MEMORY="$OPTARG" ;;
         r) RUNTIME_THREADS="$OPTARG" ;;
+        c) UPDATE_CRON_SETTINGS="$OPTARG" ;;
     esac
 done
-shift $((OPTIND -1))
+shift $((OPTIND - 1))
 
 USERNAME="nominatim"
 NOMINATIM_HOME="/srv/nominatim"
@@ -42,6 +73,9 @@ NOMINATIM_BUILD="${NOMINATIM_HOME}/build"
 PBF_DIR="${NOMINATIM_HOME}/pbf"
 PBF_ALL="${PBF_DIR}/data.pbf"
 COUNTRY_LIST="${NOMINATIM_HOME}/data/countries.txt"
+
+# Wait until data update process is finished
+wait_for_update
 
 service postgresql stop
 service apache2 stop
@@ -128,10 +162,29 @@ IMPORT_CONFIG_URL="${PGCONFIG_URL}? \
       echo $'ALTER SYSTEM SET logging_collector TO \'on\';\n'; \
     ) | sudo -u postgres psql -e && \
     service postgresql stop
-    
+
+#Setup cron job running update-multiple-countries.sh periodically
+echo "EXTRA_OPTS=\"-L 8\"" >> /etc/default/cron
+
+UPDATE_SCRIPT="/srv/nominatim/utils/update.sh"
+UPDATE_LOG_PATH="/var/log/nominatim-update.log"
+CRONJOB="${UPDATE_CRON_SETTINGS} bash $UPDATE_SCRIPT $UPDATE_LOG_PATH"
+CRONJOB_FILE="/etc/cron.d/nominatim-update"
+echo "$CRONJOB" > "$CRONJOB_FILE"
+chmod +x "$UPDATE_SCRIPT"
+chmod +x "$CRONJOB_FILE"
+crontab "$CRONJOB_FILE"
+
+echo "Configured cron job for Nominatim data update:"
+cat "$CRONJOB_FILE"
+
+service cron restart
+
 service postgresql start
 
 tail -f /var/log/apache2/access.log &
 
-# Run Apache in the foreground
+echo "Initializtion finished on $(date)"
+
+# Run Apache in the foreground (to keep docker container running)
 /usr/sbin/apache2ctl -D FOREGROUND
