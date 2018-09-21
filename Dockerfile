@@ -73,7 +73,7 @@ RUN apt-get install -y --no-install-recommends \
 
 RUN apt-get clean \
   && rm -rf /tmp/* /var/tmp/*
-  
+
 ENV NOMINATIM_HOME /srv/nominatim
 ENV NOMINATIM_BUILD ${NOMINATIM_HOME}/build
 
@@ -124,7 +124,7 @@ RUN cd ${NOMINATIM_HOME}/utils && \
 	wget -q http://m.m.i24.cc/osmconvert.c && \
 	cc -x c osmconvert.c -lz -O3 -o osmconvert && \
 	rm osmconvert.c
-	
+
 # Configure Apache
 ENV INTERNAL_LISTEN_PORT 8080
 USER root
@@ -161,3 +161,8 @@ COPY --chown=nominatim scripts/init-pbf.sh ${NOMINATIM_HOME}/utils/
 COPY --chown=nominatim scripts/update-multiple-countries.sh ${NOMINATIM_HOME}/utils/update.sh
 USER ${USERNAME}
 RUN chmod +x ${NOMINATIM_HOME}/utils/init-pbf.sh ${NOMINATIM_HOME}/utils/update.sh
+
+USER root
+COPY scripts/init-pbf.sh /
+RUN chmod +x /init-pbf.sh
+ENTRYPOINT ["/init-pbf.sh"]

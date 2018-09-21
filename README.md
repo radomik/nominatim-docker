@@ -25,32 +25,22 @@ docker build . -t <tag_name>
 The following will create a new container, import PBF files and start Nominatim server configured with periodic updates enabled.
 
 ```shell
-docker run -d -p 8089:8080 --user=root <tag_name> /srv/nominatim/utils/init-pbf.sh -p europe/monaco -p europe/andorra -p europe/latvia
-docker run -d -p 8089:8080 --user=root <tag_name> /srv/nominatim/utils/init-pbf.sh -p europe/monaco
+# Remember to place <tag_name> always at the end otherwise envirioment variables won't be passed
+docker run -d -p 8089:8080 --user=root -e countries="europe/monaco europe/andorra europe/latvia" <tag_name>
 ```
 
-For parameter description and default values see:
-```shell
-docker run -p 8089:8080 --user=root <tag_name> /srv/nominatim/utils/init-pbf.sh --help
-###
-Available arguments:
-	-p europe/country1 -p europe/country2 ...
-		List of countries to be imported into Nominatim search engine
-	-b <build memory (default: 5 GB)>
-		Amount of memory in gigabytes used by Postgres database during Nominatim data initial import
-	-o <OSM cache size (default: 3800 MB)>
-		Amount of memory in megabytes used by OSM2PGSQL cache during Nominatim data initial import (shall be 75% of value given in `-b` option)
-	-t <build thread count (default: 4)>
-		Thread count used by Postgres during Nominatim data import
-	-j <runtime memory (default: 4 GB)>
-		Amount of memory in gigabytes used by Postgres database at runtime
-	-r <runtime thread count (default: 2)>
-		Thread count used by Postgres at Nominatim runtime
-	-c <data update cron settings (default: '40 4 * * *')>
-		Crontab setting for Nominatim data update cron job (See https://crontab.guru/)
-	-L <cron log level (default: 0)>
-		Cron log level (see: `man cron`)
-```
+Available environment parameters are:
+
+|  Name |  Default value | Description |
+|---|---|---|
+| countries | | List of space separated countries to be imported into Nominatim search engine |
+| build_memory | 5 | Amount of memory in gigabytes used by Postgres database during Nominatim data initial import |
+| osm_cache_size | 3800 | Amount of memory in megabytes used by OSM2PGSQL cache during Nominatim data initial import (shall be 75% of value given in `-b` option) | 
+| build_thread_count | 8 | Thread count used by Postgres during Nominatim data import |
+| runtime_thread_count | 4 | Thread count used by Postgres at Nominatim runtime |
+| runtime_memory | 4 | Amount of memory in gigabytes used by Postgres database at runtime |
+| update_cron_settings | 40 4 * * * | Crontab setting for Nominatim data update cron job (See https://crontab.guru/) |
+| cron_log_level | 0 | Cron log level (see: `man cron`) |
 
 It may be useful to see logs directly after running container:
 ```shell
@@ -84,7 +74,7 @@ symmetra/nominatim-docker   latest              94904d9b4847        2 minutes ag
 ~/projects/radomik-nominatim-docker (master) $ docker build . -t symmetra/nominatim-docker
 
 # Import data and setup container (data update every minute) & show logs of above command
-docker run -d -p 8089:8080 --user=root symmetra/nominatim-docker /srv/nominatim/utils/init-pbf.sh -p europe/monaco -p europe/andorra -c "* * * * *"
+docker run -d -p 8089:8080 --user=root -e countries="europe/monaco europe/andorra" -e update_cron_settings="* * * * *" symmetra/nominatim-docker
 97329f4b643c9660d28d62df0bafbe733f7f33f44e0b9f434afde57d64bbedb4
 
 ~/projects/radomik-nominatim-docker (master) $ docker container logs -f 97329f4b643c9660d28d62df0bafbe733f7f33f44e0b9f434afde57d64bbedb4

@@ -20,56 +20,44 @@ function wait_for_update {
 	fi
 }
 
-COUNTRIES=()
-BUILD_MEMORY=5
-OSM2PGSQL_CACHE=3800
-BUILD_THREADS=4
-RUNTIME_THREADS=2
-RUNTIME_MEMORY=4
-UPDATE_CRON_SETTINGS="40 4 * * *"
-CRON_LOG_LEVEL=0
+env
+echo ""
 
-if [ $# -eq 0 -o "$1" == "-h" -o "$1" == "--help" ] ; then
-	echo -e \
-"Available arguments:\n\
-	-p europe/country1 -p europe/country2 ...\n\
-		List of countries to be imported into Nominatim search engine\n\
-	-b <build memory (default: $BUILD_MEMORY GB)>\n\
-		Amount of memory in gigabytes used by Postgres database during Nominatim data initial import\n\
-	-o <OSM cache size (default: $OSM2PGSQL_CACHE MB)>\n\
-		Amount of memory in megabytes used by OSM2PGSQL cache during Nominatim data initial import (shall be 75% of value given in \`-b\` option)\n\
-	-t <build thread count (default: $BUILD_THREADS)>\n\
-		Thread count used by Postgres during Nominatim data import\n\
-	-j <runtime memory (default: $RUNTIME_MEMORY GB)>\n\
-		Amount of memory in gigabytes used by Postgres database at runtime\n\
-	-r <runtime thread count (default: $RUNTIME_THREADS)>\n\
-		Thread count used by Postgres at Nominatim runtime\n\
-	-c <data update cron settings (default: '$UPDATE_CRON_SETTINGS')>\n\
-		Crontab setting for Nominatim data update cron job (See https://crontab.guru/)\n\
-	-L <cron log level (default: $CRON_LOG_LEVEL)>\n\
-		Cron log level (see: \`man cron\`)\n\
-	"
-	exit 0
-fi
+# Initialization parameters (passed as environment parameters)
+COUNTRY_LIST=${countries:=""}
+BUILD_MEMORY=${build_memory:=5}
+OSM2PGSQL_CACHE=${osm_cache_size:=3800}
+BUILD_THREADS=${build_thread_count:=8}
+RUNTIME_THREADS=${runtime_thread_count:=4}
+RUNTIME_MEMORY=${runtime_memory:=4}
+UPDATE_CRON_SETTINGS=${update_cron_settings:="40 4 * * *"}
+CRON_LOG_LEVEL=${cron_log_level:=0}
+COUNTRIES=($COUNTRY_LIST)
 
 if [ "$(whoami)" != "root" ] ; then
 	echo "Script shall be run as root. Current user: $(whoami)"
 	exit 1
 fi
 
-while getopts "p:b:o:t:j:r:c:L:" OPT; do
-    case "$OPT" in
-        p) COUNTRIES+=("$OPTARG") ;;
-        b) BUILD_MEMORY="$OPTARG" ;;
-        o) OSM2PGSQL_CACHE="$OPTARG" ;;
-        t) BUILD_THREADS="$OPTARG" ;;
-        j) RUNTIME_MEMORY="$OPTARG" ;;
-        r) RUNTIME_THREADS="$OPTARG" ;;
-        c) UPDATE_CRON_SETTINGS="$OPTARG" ;;
-        L) CRON_LOG_LEVEL="$OPTARG" ;;
-    esac
+if [ ${#COUNTRIES[@]} -eq 0 ] ; then
+	echo "No countries arguments provided"
+	exit 1
+fi
+
+echo "Using settings:"
+echo "BUILD_MEMORY=$BUILD_MEMORY"
+echo "OSM2PGSQL_CACHE=$OSM2PGSQL_CACHE"
+echo "BUILD_THREADS=$BUILD_THREADS"
+echo "RUNTIME_MEMORY=$RUNTIME_MEMORY"
+echo "RUNTIME_THREADS=$RUNTIME_THREADS"
+echo "UPDATE_CRON_SETTINGS=$UPDATE_CRON_SETTINGS"
+echo "CRON_LOG_LEVEL=$CRON_LOG_LEVEL"
+echo ""
+echo "Using countries:"
+for COUNTRY in "${COUNTRIES[@]}" ; do
+  echo "* $COUNTRY"
 done
-shift $((OPTIND - 1))
+echo ""
 
 USERNAME="nominatim"
 NOMINATIM_HOME="/srv/nominatim"
