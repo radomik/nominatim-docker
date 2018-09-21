@@ -1,6 +1,9 @@
 #!/bin/bash
 # Usage:
 # ./update-multiple-countries.sh [<log file>]
+#
+# See also: https://github.com/openstreetmap/Nominatim/issues/60
+# Nominatim-Osmium does not support update multiple countries by default
 
 DEFAULT_OUT="/dev/stdout"
 OUT="$DEFAULT_OUT"
@@ -13,6 +16,7 @@ BUILD_DIR="${NOMINATIM_HOME}/build"
 UPDATE_PHP="./utils/update.php"
 LOCKED=0
 LOCK_DIR="/var/run/nominatim-update.lock"
+UPDATE_URL="http://download.geofabrik.de"
 
 function init_log {
   if [ ! -z "$CUSTOM_OUT" ] ; then
@@ -88,18 +92,18 @@ echo "[$$] Starting Nominatim data update at $(date)" >>"$OUT" 2>&1
 while read -r COUNTRY; do
 	COUNTRY_UPDATE_DIR="${UPDATES_DIR}/$COUNTRY"
   COUNTRY_CONFIG_FILE="${COUNTRY_UPDATE_DIR}/configuration.txt"
-  if [ ! -f "$COUNTRY_CONFIG_FILE" ] ; then
-      run_cmd sudo -u $USERNAME mkdir -p "$COUNTRY_UPDATE_DIR" >>"$OUT" 2>&1
-      run_cmd sudo -u $USERNAME osmosis --rrii workingDirectory=${COUNTRY_UPDATE_DIR}/.
 
-      sudo -u $USERNAME echo "baseUrl=http://download.geofabrik.de/${COUNTRY}-updates" > "$COUNTRY_CONFIG_FILE"
-      sudo -u $USERNAME echo "maxInterval = 0" >> "$COUNTRY_CONFIG_FILE"
-      cd "$COUNTRY_UPDATE_DIR"
+  run_cmd sudo -u $USERNAME mkdir -p "$COUNTRY_UPDATE_DIR" >>"$OUT" 2>&1
+  run_cmd sudo -u $USERNAME osmosis --rrii workingDirectory=${COUNTRY_UPDATE_DIR}/.
 
-      run_cmd sudo -u $USERNAME wget -q "http://download.geofabrik.de/${COUNTRY}-updates/state.txt" >>"$OUT" 2>&1
-      echo "[$$] $COUNTRY state.txt content:" >>"$OUT" 2>&1
-      cat state.txt >>"$OUT" 2>&1
-  fi
+  sudo -u $USERNAME echo "baseUrl=${UPDATE_URL}/${COUNTRY}-updates" > "$COUNTRY_CONFIG_FILE"
+  sudo -u $USERNAME echo "maxInterval = 0" >> "$COUNTRY_CONFIG_FILE"
+  cd "$COUNTRY_UPDATE_DIR"
+
+  run_cmd sudo -u $USERNAME wget -q "${UPDATE_URL}/${COUNTRY}-updates/state.txt" >>"$OUT" 2>&1
+  echo "[$$] $COUNTRY state.txt content:" >>"$OUT" 2>&1
+  cat state.txt >>"$OUT" 2>&1
+
   COUNTRY_OSC_FILENAME=${COUNTRY//[\/]/_}
   run_cmd sudo -u $USERNAME osmosis --rri workingDirectory=${COUNTRY_UPDATE_DIR}/. --wxc ${COUNTRY_OSC_FILENAME}.osc.gz
 done < "$COUNTRY_LIST"
@@ -124,8 +128,11 @@ if ((${INDEX})); then
   run_cmd sudo -u $USERNAME "$UPDATE_PHP" --index
 fi
 
-### Remove all diff files
-find "$UPDATES_DIR" -type f -name *.osc.gz -exec rm -v {} \;
+### Remove all data
+while read -r COUNTRY; do
+	COUNTRY_UPDATE_DIR="${UPDATES_DIR}/$COUNTRY"
+  rm -rv "$COUNTRY_UPDATE_DIR"
+done < "$COUNTRY_LIST"
 
 echo "[$$] Finished Nominatim data update at $(date)" >>"$OUT" 2>&1
 onexit
