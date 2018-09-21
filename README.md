@@ -48,6 +48,8 @@ Available arguments:
 		Thread count used by Postgres at Nominatim runtime
 	-c <data update cron settings (default: '40 4 * * *')>
 		Crontab setting for Nominatim data update cron job (See https://crontab.guru/)
+	-L <cron log level (default: 0)>
+		Cron log level (see: `man cron`)
 ```
 
 It may be useful to see logs directly after running container:
