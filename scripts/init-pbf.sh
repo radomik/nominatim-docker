@@ -27,6 +27,7 @@ BUILD_THREADS=4
 RUNTIME_THREADS=2
 RUNTIME_MEMORY=4
 UPDATE_CRON_SETTINGS="40 4 * * *"
+CRON_LOG_LEVEL=0
 
 if [ $# -eq 0 -o "$1" == "-h" -o "$1" == "--help" ] ; then
 	echo -e \
@@ -45,6 +46,8 @@ if [ $# -eq 0 -o "$1" == "-h" -o "$1" == "--help" ] ; then
 		Thread count used by Postgres at Nominatim runtime\n\
 	-c <data update cron settings (default: '$UPDATE_CRON_SETTINGS')>\n\
 		Crontab setting for Nominatim data update cron job (See https://crontab.guru/)\n\
+	-L <cron log level (default: $CRON_LOG_LEVEL)>\n\
+		Cron log level (see: \`man cron\`)\n\
 	"
 	exit 0
 fi
@@ -54,7 +57,7 @@ if [ "$(whoami)" != "root" ] ; then
 	exit 1
 fi
 
-while getopts "p:b:o:t:j:r:c:" OPT; do
+while getopts "p:b:o:t:j:r:c:L:" OPT; do
     case "$OPT" in
         p) COUNTRIES+=("$OPTARG") ;;
         b) BUILD_MEMORY="$OPTARG" ;;
@@ -63,6 +66,7 @@ while getopts "p:b:o:t:j:r:c:" OPT; do
         j) RUNTIME_MEMORY="$OPTARG" ;;
         r) RUNTIME_THREADS="$OPTARG" ;;
         c) UPDATE_CRON_SETTINGS="$OPTARG" ;;
+        L) CRON_LOG_LEVEL="$OPTARG" ;;
     esac
 done
 shift $((OPTIND - 1))
@@ -164,13 +168,12 @@ IMPORT_CONFIG_URL="${PGCONFIG_URL}? \
     service postgresql stop
 
 #Setup cron job running update-multiple-countries.sh periodically
-echo "EXTRA_OPTS=\"-L 8\"" >> /etc/default/cron
-
 UPDATE_SCRIPT="/srv/nominatim/utils/update.sh"
 UPDATE_LOG_PATH="/var/log/nominatim-update.log"
-CRONJOB="${UPDATE_CRON_SETTINGS} bash $UPDATE_SCRIPT $UPDATE_LOG_PATH"
+CRONJOB="${UPDATE_CRON_SETTINGS} root $UPDATE_SCRIPT $UPDATE_LOG_PATH"
 CRONJOB_FILE="/etc/cron.d/nominatim-update"
-echo "$CRONJOB" > "$CRONJOB_FILE"
+echo "MAILTO=\"\"" > "$CRONJOB_FILE"
+echo "$CRONJOB" >> "$CRONJOB_FILE"
 chmod +x "$UPDATE_SCRIPT"
 chmod +x "$CRONJOB_FILE"
 crontab "$CRONJOB_FILE"
@@ -178,7 +181,10 @@ crontab "$CRONJOB_FILE"
 echo "Configured cron job for Nominatim data update:"
 cat "$CRONJOB_FILE"
 
-service cron restart
+echo "Starting system logging deamon"
+rsyslogd
+echo "Starting cron deamon with log level: $CRON_LOG_LEVEL"
+cron -L${CRON_LOG_LEVEL}
 
 service postgresql start
 

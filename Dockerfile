@@ -28,52 +28,59 @@ RUN update-locale LANG=en_US.UTF-8
 # Install build dependencies
 USER root
 RUN apt-get install -y --no-install-recommends \
-    build-essential \
-    cmake \
-    curl \
-    g++ \
-    gcc \
-    cron \
-    anacron \
-	libboost-dev \
-	libboost-filesystem-dev \
-	libboost-python-dev \
-	libboost-system-dev \
-	libbz2-dev \
-	libexpat1-dev \
-	libgeos-dev \
-	libgeos++-dev \
-	libpq-dev \
-	libproj-dev \
-	libxml2-dev\
-    php \
-    postgresql-server-dev-${PGSQL_VERSION} \
-    zlib1g-dev \
-	apache2 \
-    curl \
-    libapache2-mod-php \
-    osmosis \
-    php \
-    php-db \
-    php-intl \
-    php-pear \
-    php-pgsql \
-    postgresql-${PGSQL_VERSION}-postgis-${POSTGIS_VERSION} \
-	postgresql-${PGSQL_VERSION}-postgis-scripts \
-	postgresql-contrib-${PGSQL_VERSION} \
-	postgresql-server-dev-${PGSQL_VERSION} \
-	python \
-	python-pip \
-	python-setuptools \
-    sudo \
-    wget
+  build-essential \
+  cmake \
+  curl \
+  g++ \
+  gcc \
+  cron \
+  anacron \
+  libboost-dev \
+  libboost-filesystem-dev \
+  libboost-python-dev \
+  libboost-system-dev \
+  libbz2-dev \
+  libexpat1-dev \
+  libgeos-dev \
+  libgeos++-dev \
+  libpq-dev \
+  libproj-dev \
+  libxml2-dev\
+  php \
+  postgresql-server-dev-${PGSQL_VERSION} \
+  zlib1g-dev \
+  apache2 \
+  curl \
+  libapache2-mod-php \
+  osmosis \
+  php \
+  php-db \
+  php-intl \
+  php-pear \
+  php-pgsql \
+  postgresql-${PGSQL_VERSION}-postgis-${POSTGIS_VERSION} \
+  postgresql-${PGSQL_VERSION}-postgis-scripts \
+  postgresql-contrib-${PGSQL_VERSION} \
+  postgresql-server-dev-${PGSQL_VERSION} \
+  python \
+  python-pip \
+  python-setuptools \
+  sudo \
+  wget \
+  rsyslog \
+  logrotate \
+  tree
 
 RUN apt-get clean \
-  && rm -rf /var/lib/apt/lists/* \
   && rm -rf /tmp/* /var/tmp/*
   
 ENV NOMINATIM_HOME /srv/nominatim
 ENV NOMINATIM_BUILD ${NOMINATIM_HOME}/build
+
+# Install osmium
+USER root
+RUN pip install --upgrade pip
+RUN pip install osmium
 
 # Build Nominatim
 USER root
@@ -90,15 +97,10 @@ RUN cd /srv \
  && cmake ${NOMINATIM_HOME} \
  && make
 
-# Install osmium
-USER root
-RUN pip install --upgrade pip
-RUN pip install osmium
-
 # Create nominatim user account
 USER root
 ENV USERNAME nominatim
-RUN useradd -d ${NOMINATIM_HOME} -s /bin/bash -m ${USERNAME}
+RUN useradd --home-dir ${NOMINATIM_HOME} --shell /bin/bash --no-create-home ${USERNAME}
 RUN chown -R ${USERNAME}:${USERNAME} ${NOMINATIM_HOME}
 RUN chmod a+x ${NOMINATIM_HOME}
 
@@ -159,9 +161,3 @@ COPY --chown=nominatim scripts/init-pbf.sh ${NOMINATIM_HOME}/utils/
 COPY --chown=nominatim scripts/update-multiple-countries.sh ${NOMINATIM_HOME}/utils/update.sh
 USER ${USERNAME}
 RUN chmod +x ${NOMINATIM_HOME}/utils/init-pbf.sh ${NOMINATIM_HOME}/utils/update.sh
-
-# Init scripts
-#COPY scripts/docker-entrypoint.sh /
-#USER root
-#RUN chmod +x /docker-entrypoint.sh
-#ENTRYPOINT ["/docker-entrypoint.sh"]
