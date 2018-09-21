@@ -24,14 +24,14 @@ env
 echo ""
 
 # Initialization parameters (passed as environment parameters)
-COUNTRY_LIST=${countries:=""}
-BUILD_MEMORY=${build_memory:=5}
-OSM2PGSQL_CACHE=${osm_cache_size:=3800}
-BUILD_THREADS=${build_thread_count:=8}
-RUNTIME_THREADS=${runtime_thread_count:=4}
-RUNTIME_MEMORY=${runtime_memory:=4}
-UPDATE_CRON_SETTINGS=${update_cron_settings:="40 4 * * *"}
-CRON_LOG_LEVEL=${cron_log_level:=0}
+COUNTRY_LIST=${COUNTRIES:=""}
+BUILD_MEMORY=${BUILD_MEMORY:=5}
+OSM2PGSQL_CACHE=${OSM_CACHE_SIZE:=3800}
+BUILD_THREADS=${BUILD_THREAD_COUNT:=8}
+RUNTIME_THREADS=${RUNTIME_THREAD_COUNT:=4}
+RUNTIME_MEMORY=${RUNTIME_MEMORY:=4}
+UPDATE_CRON_SETTINGS=${UPDATE_CRON_SETTINGS:="40 4 * * *"}
+CRON_LOG_LEVEL=${CRON_LOG_LEVEL:=0}
 COUNTRIES=($COUNTRY_LIST)
 
 if [ "$(whoami)" != "root" ] ; then
