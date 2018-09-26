@@ -96,6 +96,7 @@ RUN cd /srv \
  && cd ${NOMINATIM_BUILD} \
  && cmake ${NOMINATIM_HOME} \
  && make
+RUN unset NOMINATIM_VERSION
 
 # Create nominatim user account
 USER root
@@ -109,21 +110,25 @@ USER ${USERNAME}
 WORKDIR ${NOMINATIM_HOME}
 ENV FLATNODE_PATH ${NOMINATIM_HOME}/flatnode
 ENV PYOSMIUM_PATH /usr/local/bin/pyosmium-get-changes
+ENV LOCAL_PHP "${NOMINATIM_HOME}/settings/local.php"
+ENV BUILD_LOCAL_PHP "${NOMINATIM_BUILD}/settings/local.php"
 RUN test -f ${FLATNODE_PATH} || echo "[WARNING] CONST_Osm2pgsql_Flatnode_File not found: ${FLATNODE_PATH}"
 RUN test -f ${PYOSMIUM_PATH} || echo "[WARNING] CONST_Pyosmium_Binary not found: ${PYOSMIUM_PATH}"
-RUN echo "<?php" > ./settings/local.php
-RUN echo "# Paths" >> ./settings/local.php
-RUN echo "@define('CONST_Postgresql_Version', '${PGSQL_VERSION}');" >> ./settings/local.php
-RUN echo "@define('CONST_Postgis_Version', '${POSTGIS_VERSION}');" >> ./settings/local.php
-RUN echo "@define('CONST_Osm2pgsql_Flatnode_File', '${FLATNODE_PATH}');" >> ./settings/local.php
-RUN echo "@define('CONST_Pyosmium_Binary', '${PYOSMIUM_PATH}');" >> ./settings/local.php
-RUN echo "# Website settings" >> ./settings/local.php
-RUN echo "@define('CONST_Website_BaseURL', '/');" >> ./settings/local.php
-RUN echo "?>" >> ./settings/local.php
+RUN echo "<?php" > "$LOCAL_PHP"
+RUN echo "# Paths" >> "$LOCAL_PHP"
+RUN echo "@define('CONST_Postgresql_Version', '${PGSQL_VERSION}');" >> "$LOCAL_PHP"
+RUN echo "@define('CONST_Postgis_Version', '${POSTGIS_VERSION}');" >> "$LOCAL_PHP"
+RUN echo "@define('CONST_Osm2pgsql_Flatnode_File', '${FLATNODE_PATH}');" >> "$LOCAL_PHP"
+RUN echo "@define('CONST_Pyosmium_Binary', '${PYOSMIUM_PATH}');" >> "$LOCAL_PHP"
+RUN echo "# Website settings" >> "$LOCAL_PHP"
+RUN echo "@define('CONST_Website_BaseURL', '/');" >> "$LOCAL_PHP"
+RUN echo "?>" >> "$LOCAL_PHP"
+RUN ln -s "$LOCAL_PHP" "$BUILD_LOCAL_PHP"
 RUN cd ${NOMINATIM_HOME}/utils && \
 	wget -q http://m.m.i24.cc/osmconvert.c && \
 	cc -x c osmconvert.c -lz -O3 -o osmconvert && \
 	rm osmconvert.c
+RUN unset FLATNODE_PATH PYOSMIUM_PATH LOCAL_PHP BUILD_LOCAL_PHP
 
 # Configure Apache
 ENV INTERNAL_LISTEN_PORT 8080
@@ -141,6 +146,7 @@ RUN echo -e "Listen ${INTERNAL_LISTEN_PORT}\n\
   </Directory>\n\
   AddType text/html .php\n\
 </VirtualHost>\n" > /etc/apache2/sites-enabled/000-default.conf
+RUN unset INTERNAL_LISTEN_PORT
 
 # Add postgres users
 USER root
@@ -161,6 +167,9 @@ COPY --chown=nominatim scripts/init-pbf.sh ${NOMINATIM_HOME}/utils/
 COPY --chown=nominatim scripts/update-multiple-countries.sh ${NOMINATIM_HOME}/utils/update.sh
 USER ${USERNAME}
 RUN chmod +x ${NOMINATIM_HOME}/utils/init-pbf.sh ${NOMINATIM_HOME}/utils/update.sh
+
+USER root
+RUN unset USERNAME PGSQL_VERSION POSTGIS_VERSION
 
 USER root
 COPY scripts/init-pbf.sh /
