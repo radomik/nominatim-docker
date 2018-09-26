@@ -73,7 +73,11 @@ symmetra/nominatim-docker   latest              94904d9b4847        2 minutes ag
 ~/projects/radomik-nominatim-docker (master) $ docker build . -t symmetra/nominatim-docker
 
 # Import data and setup container (data update every minute) & show logs of above command
+## Dell M6600
 docker run -d -p 8090:8080 --user=root --restart=always -e COUNTRIES="europe/monaco europe/andorra europe/switzerland" -e UPDATE_CRON_SETTINGS="*/60 * * * *" -e BUILD_MEMORY=20 -e BUILD_THREADS=12 -e RUNTIME_MEMORY=10 -e RUNTIME_THREADS=3 symmetra/nominatim-docker
+97329f4b643c9660d28d62df0bafbe733f7f33f44e0b9f434afde57d64bbedb4
+## Virtualbox
+docker run -d -p 8090:8080 --user=root --restart=always -e COUNTRIES="europe/monaco europe/andorra" -e UPDATE_CRON_SETTINGS="*/60 * * * *" -e BUILD_MEMORY=6 -e BUILD_THREADS=4 -e RUNTIME_MEMORY=4 -e RUNTIME_THREADS=2 symmetra/nominatim-docker
 97329f4b643c9660d28d62df0bafbe733f7f33f44e0b9f434afde57d64bbedb4
 
 ~/projects/radomik-nominatim-docker (master) $ docker container logs -f 97329f4b643c9660d28d62df0bafbe733f7f33f44e0b9f434afde57d64bbedb4
