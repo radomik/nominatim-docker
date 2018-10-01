@@ -106,6 +106,7 @@ function initial_startup {
 	sudo -u $USERNAME rm -r ${PBF_DIR}
 	sudo -u $USERNAME mkdir ${PBF_DIR}
 	cd ${PBF_DIR}
+	#todo: Do not convert to o5m if there is only one country imported
 	rm -v "$COUNTRY_LIST"
 	for COUNTRY in "${COUNTRIES[@]}" ; do
 		sudo -u $USERNAME echo "$COUNTRY" >> "$COUNTRY_LIST"
@@ -124,7 +125,7 @@ function initial_startup {
 	sudo -u $USERNAME ${OSMCONVERT} *.o5m -o=${O5M}
 	echo "Convert: ${O5M} -> ${PBF_ALL}"
 	sudo -u $USERNAME ${OSMCONVERT} ${O5M} -o=${PBF_ALL}
-	sudo -u $USERNAME rm ${O5M}
+	sudo -u $USERNAME rm -v *.o5m *.pbf
 
 	# Filter administrative boundaries
 	#TODO: Make if needed based on merlinnot/nominatim-docker
