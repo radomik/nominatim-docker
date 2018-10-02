@@ -109,15 +109,25 @@ function initial_startup {
 	#todo: Do not convert to o5m if there is only one country imported
 	rm -v "$COUNTRY_LIST"
 	for COUNTRY in "${COUNTRIES[@]}" ; do
-		sudo -u $USERNAME echo "$COUNTRY" >> "$COUNTRY_LIST"
 		URL="http://download.geofabrik.de/${COUNTRY}-latest.osm.pbf"
 		PBF=`echo "$URL" | sed 's:.*/::'`
 		O5M=$(echo ${PBF} | sed 's/.osm.pbf$/.o5m/g')
 		echo "Fetch ${URL} to ${PBF}"
-		sudo -u $USERNAME wget -q -O "$PBF" "${URL}"
+		sudo -u $USERNAME wget -q -O "$PBF" "$URL"
+		if [ $? -ne 0 ] ; then
+			echo "Failed to download $URL"
+			rm -v "$PBF"
+			continue
+		fi
 		echo "Convert: ${PBF} -> ${O5M}"
 		sudo -u $USERNAME ${OSMCONVERT} ${PBF} -o=${O5M}
 		sudo -u $USERNAME rm -v ${PBF}
+		if [ $? -ne 0 ] ; then
+			echo "Failed to convert $PBF"
+			rm -v "$O5M"
+			continue
+		fi
+		sudo -u $USERNAME echo "$COUNTRY" >> "$COUNTRY_LIST"
 	done
 
 	O5M="data.o5m"
