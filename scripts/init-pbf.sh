@@ -117,7 +117,7 @@ function initial_startup {
 		sudo -u $USERNAME wget -q -O "$PBF" "${URL}"
 		echo "Convert: ${PBF} -> ${O5M}"
 		sudo -u $USERNAME ${OSMCONVERT} ${PBF} -o=${O5M}
-		sudo -u $USERNAME rm ${PBF}
+		sudo -u $USERNAME rm -v ${PBF}
 	done
 
 	O5M="data.o5m"
@@ -125,7 +125,7 @@ function initial_startup {
 	sudo -u $USERNAME ${OSMCONVERT} *.o5m -o=${O5M}
 	echo "Convert: ${O5M} -> ${PBF_ALL}"
 	sudo -u $USERNAME ${OSMCONVERT} ${O5M} -o=${PBF_ALL}
-	sudo -u $USERNAME rm -v *.o5m *.pbf
+	sudo -u $USERNAME rm -v *.o5m
 
 	# Filter administrative boundaries
 	#TODO: Make if needed based on merlinnot/nominatim-docker
